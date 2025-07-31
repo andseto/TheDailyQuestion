@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:the_daily_question/pages/login_page.dart';
 import 'package:the_daily_question/question_screen.dart';
 
 void main() {

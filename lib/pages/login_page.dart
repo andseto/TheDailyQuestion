@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:the_daily_question/widgets/rounded_test_form_field.dart';
 
 class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
@@ -36,7 +38,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _header(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: MediaQuery.of(context).size.width,
       height: MediaQuery.of(context).size.height * .25,
       child: Padding(
