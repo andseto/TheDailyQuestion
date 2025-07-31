@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "980716637851",
+    "project_id": "thedailyquestiontp",
+    "storage_bucket": "thedailyquestiontp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:980716637851:android:4e9ece07e1f56efbd2c03e",
+        "android_client_info": {
+          "package_name": "com.example.the_daily_question"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDiweCx6aHFIMsKLiLxS1MBRmY-LuEusos"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:the_daily_question/widgets/rounded_test_form_field.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:the_daily_question/pages/question_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -10,6 +13,10 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   bool showLogin = true; // Track current selection
+
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController usernameController = TextEditingController(); // For signup
 
   @override
   Widget build(BuildContext context) {
@@ -28,8 +35,8 @@ class _LoginPageState extends State<LoginPage> {
           // Foreground Content
           Column(
             children: [
-              _header(context),                      // Top logo + title
-              _loginForm(context),                   // Lower login/signup card
+              _header(context), // Top logo + title
+              _loginForm(context), // Lower login/signup card
             ],
           ),
         ],
@@ -85,8 +92,10 @@ class _LoginPageState extends State<LoginPage> {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius:
-              BorderRadius.only(topLeft: Radius.circular(30), topRight: Radius.circular(30)),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(30),
+            topRight: Radius.circular(30),
+          ),
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 25),
@@ -132,7 +141,9 @@ class _LoginPageState extends State<LoginPage> {
         onTap: onTap,
         child: Container(
           alignment: Alignment.center,
-          padding: EdgeInsets.all(4), // Add spacing between button and outer border
+          padding: EdgeInsets.all(
+            4,
+          ), // Add spacing between button and outer border
           child: Container(
             decoration: BoxDecoration(
               color: selected ? Colors.white : Colors.transparent,
@@ -161,6 +172,7 @@ class _LoginPageState extends State<LoginPage> {
         RoundedTextFormField(
           prefixIcon: Icons.email_outlined,
           hintText: "Email address",
+          controller: emailController,
         ),
 
         SizedBox(height: 16),
@@ -170,6 +182,7 @@ class _LoginPageState extends State<LoginPage> {
           prefixIcon: Icons.lock_outline,
           hintText: "Password",
           obscureText: true,
+          controller: passwordController,
         ),
 
         SizedBox(height: 10),
@@ -185,7 +198,23 @@ class _LoginPageState extends State<LoginPage> {
         SizedBox(height: 16),
 
         ElevatedButton(
-          onPressed: () {},
+          onPressed: () async {
+            try {
+              await FirebaseAuth.instance.signInWithEmailAndPassword(
+                email: emailController.text.trim(),
+                password: passwordController.text.trim(),
+              );
+
+              // Navigate to QuestionScreen
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const QuestionPage()),
+              );
+            } catch (e) {
+              //Error if something went wrong with Login
+              print("Login error: $e");
+            }
+          },
           style: ElevatedButton.styleFrom(
             backgroundColor: Color.fromRGBO(33, 150, 243, 1.0),
             foregroundColor: Colors.white,
@@ -201,28 +230,14 @@ class _LoginPageState extends State<LoginPage> {
 
         Row(
           children: [
-            Expanded(
-              child: Divider(
-                color: Colors.grey,
-                thickness: .6),
-            ),
+            Expanded(child: Divider(color: Colors.grey, thickness: .6)),
 
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 8.0),
-              child: Text(
-                "Or",
-                style: TextStyle(
-                  color: Colors.grey[600],
-                ),
-              ),
+              child: Text("Or", style: TextStyle(color: Colors.grey[600])),
             ),
 
-            Expanded(
-              child: Divider(
-                color: Colors.grey,
-                thickness: .6,
-              ),
-            ),
+            Expanded(child: Divider(color: Colors.grey, thickness: .6)),
           ],
         ),
       ],
@@ -237,6 +252,7 @@ class _LoginPageState extends State<LoginPage> {
         RoundedTextFormField(
           prefixIcon: Icons.person_outline,
           hintText: "Username",
+          controller: usernameController,
         ),
 
         SizedBox(height: 16),
@@ -245,6 +261,7 @@ class _LoginPageState extends State<LoginPage> {
         RoundedTextFormField(
           prefixIcon: Icons.email_outlined,
           hintText: "Email address",
+          controller: emailController,
         ),
 
         SizedBox(height: 16),
@@ -254,12 +271,39 @@ class _LoginPageState extends State<LoginPage> {
           prefixIcon: Icons.lock_outline,
           hintText: "Create password",
           obscureText: true,
+          controller: passwordController,
         ),
 
         SizedBox(height: 25),
 
         ElevatedButton(
-          onPressed: () {},
+          onPressed: () async {
+            try {
+              // Step 1: Create user with Firebase Auth
+              UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+                email: emailController.text.trim(),
+                password: passwordController.text.trim(),
+              );
+
+              // Step 2: Get UID
+              String uid = userCredential.user!.uid;
+
+              // Step 3: Store additional data in Firestore
+              await FirebaseFirestore.instance.collection('users').doc(uid).set({
+                'username': usernameController.text.trim(),
+                'email': emailController.text.trim(),
+                'createdAt': Timestamp.now(),
+              });
+
+              // Step 4: Navigate to main screen
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const QuestionPage()),
+              );
+            } catch (e) {
+              print("Sign Up error: $e");
+            }
+          },
           style: ElevatedButton.styleFrom(
             backgroundColor: Color.fromRGBO(33, 150, 243, 1.0),
             foregroundColor: Colors.white,
@@ -275,28 +319,14 @@ class _LoginPageState extends State<LoginPage> {
 
         Row(
           children: [
-            Expanded(
-              child: Divider(
-                color: Colors.grey,
-                thickness: .6),
-            ),
+            Expanded(child: Divider(color: Colors.grey, thickness: .6)),
 
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 8.0),
-              child: Text(
-                "Or",
-                style: TextStyle(
-                  color: Colors.grey[600],
-                ),
-              ),
+              child: Text("Or", style: TextStyle(color: Colors.grey[600])),
             ),
 
-            Expanded(
-              child: Divider(
-                color: Colors.grey,
-                thickness: .6,
-              ),
-            ),
+            Expanded(child: Divider(color: Colors.grey, thickness: .6)),
           ],
         ),
       ],
@@ -315,5 +345,13 @@ class _LoginPageState extends State<LoginPage> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    usernameController.dispose();
+    super.dispose();
   }
 }

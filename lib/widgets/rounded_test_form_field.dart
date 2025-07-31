@@ -4,12 +4,14 @@ class RoundedTextFormField extends StatelessWidget {
   final IconData prefixIcon;
   final String hintText;
   final bool obscureText;
+  final TextEditingController? controller;
 
   const RoundedTextFormField({
     super.key,
     required this.prefixIcon,
     required this.hintText,
     this.obscureText = false,
+    this.controller,
   });
 
   @override
@@ -33,6 +35,7 @@ class RoundedTextFormField extends StatelessWidget {
             borderRadius: BorderRadius.all(Radius.circular(15)),
           ),
           child: TextFormField(
+            controller: controller,
             obscureText: obscureText,
             decoration: InputDecoration(
               prefixIcon: Icon(prefixIcon, color: Colors.blue),
