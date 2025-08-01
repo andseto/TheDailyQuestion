@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class QuestionPage extends StatefulWidget {
   const QuestionPage({super.key});
@@ -9,11 +11,25 @@ class QuestionPage extends StatefulWidget {
 
 class _QuestionPageState extends State<QuestionPage> {
   int _selectedIndex = 0;
+  bool hasVoted = false;
+  String? userVote;
+  int yesCount = 0;
+  int noCount = 0;
+  String questionText = "Loading...";
+  String currentQuestionId = "question_1"; // Default fallback
+  bool isLoading = true;
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _listenToVotes();
+    _getActiveQuestion();
   }
 
   @override
@@ -53,6 +69,225 @@ class _QuestionPageState extends State<QuestionPage> {
 
           // Foreground content
           Column(children: [_headerText(context), _questionCard(context)]),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _getActiveQuestion() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('questions')
+        .where('isActive', isEqualTo: true)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isNotEmpty) {
+      final doc = snapshot.docs.first;
+      setState(() {
+        questionText = doc['text'] ?? "No question text.";
+        currentQuestionId = doc.id;
+        isLoading = false;
+      });
+    } else {
+      setState(() {
+        questionText = "No active question.";
+        isLoading = false;
+      });
+    }
+  }
+
+  void _vote(String answer) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final questionId = currentQuestionId;
+
+    await FirebaseFirestore.instance
+        .collection('questions')
+        .doc(questionId)
+        .collection('votes')
+        .doc(user.uid)
+        .set({
+          'answer': answer,
+          'timestamp': Timestamp.now(),
+          'userId': user.uid,
+          'userEmail': user.email,
+        });
+
+    // Update count in main document using transaction
+    final questionRef = FirebaseFirestore.instance
+        .collection('questions')
+        .doc(questionId);
+
+    FirebaseFirestore.instance.runTransaction((transaction) async {
+      final snapshot = await transaction.get(questionRef);
+      final data = snapshot.data() ?? {};
+
+      int currentYes = data['yesCount'] ?? 0;
+      int currentNo = data['noCount'] ?? 0;
+
+      if (answer == 'yes') {
+        currentYes += 1;
+      } else {
+        currentNo += 1;
+      }
+
+      int totalVotes = currentYes + currentNo;
+      transaction.update(questionRef, {'totalVotes': totalVotes});
+    });
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text("You Voted '$answer'")));
+  }
+
+  void _listenToVotes() {
+    const questionId = "question_1";
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final votesRef = FirebaseFirestore.instance
+        .collection('questions')
+        .doc(questionId)
+        .collection('votes');
+
+    votesRef.snapshots().listen((snapshot) {
+      int yes = 0, no = 0;
+      String? myVote;
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        if (data['answer'] == 'yes') yes++;
+        if (data['answer'] == 'no') no++;
+        if (doc.id == uid) myVote = data['answer'];
+      }
+
+      setState(() {
+        yesCount = yes;
+        noCount = no;
+        hasVoted = myVote != null;
+        userVote = myVote;
+      });
+    });
+  }
+
+  Widget _questionCard(BuildContext context) {
+    return Container(
+      width: 325.0,
+      height: 425.0,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Stack(
+        children: [
+          //Logo on White card
+          Positioned(
+            top: 110,
+            right: -100,
+            child: Transform.rotate(
+              angle: -0.5, // in radians (~ -28 degrees)
+              child: Opacity(
+                opacity: 0.1, // make it faint
+                child: Image.asset(
+                  "assets/images/TalkingPointLogo.jpg", // replace with your logo path
+                  width: 300,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          ),
+
+          // 🔷 Main content
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20.0,
+              vertical: 25.0,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isLoading ? "Loading..." : questionText,
+                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.left,
+                ),
+
+                SizedBox(height: 15),
+
+                Row(
+                  children: [
+                    Text(
+                      "${yesCount} Yes Responses",
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+
+                    SizedBox(width: 30),
+
+                    Text(
+                      "${noCount} No Responses",
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+
+                Spacer(),
+
+                if (!hasVoted)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => _vote("yes"),
+                          icon: Icon(Icons.thumb_up_alt_outlined),
+                          label: Text("Yes"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFF007BFF),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 5),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => _vote("no"),
+                          icon: Icon(Icons.thumb_down_alt_outlined),
+                          label: Text("No"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFF007BFF),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Center(
+                    child: Text(
+                      "You voted: ${userVote?.toUpperCase()}",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -109,108 +344,6 @@ Widget _headerText(BuildContext context) {
                 print('Menu tapped');
               },
             ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _questionCard(BuildContext context) {
-  return Container(
-    width: 325.0,
-    height: 425.0,
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Stack(
-      children: [
-        //Logo on White card
-        Positioned(
-          top: 110,
-          right: -100,
-          child: Transform.rotate(
-            angle: -0.5, // in radians (~ -28 degrees)
-            child: Opacity(
-              opacity: 0.1, // make it faint
-              child: Image.asset(
-                "assets/images/TalkingPointLogo.jpg", // replace with your logo path
-                width: 300,
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-        ),
-
-        // 🔷 Main content
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 25.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Was The Tariffs Trump Imposed A Good Idea?",
-                style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.left,
-              ),
-
-              SizedBox(height: 15),
-
-              Row(
-                children: [
-                  Text(
-                    "X Responses",
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-
-              Spacer(),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  // Yes Button
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {},
-                      icon: Icon(Icons.thumb_up_alt_outlined),
-                      label: Text("Yes"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF007BFF),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  SizedBox(width: 5),
-
-                  // No Button
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {},
-                      icon: Icon(Icons.thumb_up_alt_outlined),
-                      label: Text("No"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF007BFF),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
           ),
         ),
       ],

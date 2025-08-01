@@ -16,7 +16,8 @@ class _LoginPageState extends State<LoginPage> {
 
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController usernameController = TextEditingController(); // For signup
+  final TextEditingController usernameController =
+      TextEditingController(); // For signup
 
   @override
   Widget build(BuildContext context) {
@@ -280,20 +281,25 @@ class _LoginPageState extends State<LoginPage> {
           onPressed: () async {
             try {
               // Step 1: Create user with Firebase Auth
-              UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-                email: emailController.text.trim(),
-                password: passwordController.text.trim(),
-              );
+              UserCredential userCredential = await FirebaseAuth.instance
+                  .createUserWithEmailAndPassword(
+                    email: emailController.text.trim(),
+                    password: passwordController.text.trim(),
+                  );
 
               // Step 2: Get UID
               String uid = userCredential.user!.uid;
 
               // Step 3: Store additional data in Firestore
-              await FirebaseFirestore.instance.collection('users').doc(uid).set({
-                'username': usernameController.text.trim(),
-                'email': emailController.text.trim(),
-                'createdAt': Timestamp.now(),
-              });
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(uid)
+                  .set({
+                    'username': usernameController.text.trim(),
+                    'email': emailController.text.trim(),
+                    'password': passwordController.text.trim(),
+                    'createdAt': Timestamp.now(),
+                  });
 
               // Step 4: Navigate to main screen
               Navigator.pushReplacement(
