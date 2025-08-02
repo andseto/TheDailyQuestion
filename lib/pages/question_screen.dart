@@ -88,6 +88,7 @@ class _QuestionPageState extends State<QuestionPage> {
         currentQuestionId = doc.id;
         isLoading = false;
       });
+      _listenToVotes();
     } else {
       setState(() {
         questionText = "No active question.";
@@ -142,7 +143,7 @@ class _QuestionPageState extends State<QuestionPage> {
   }
 
   void _listenToVotes() {
-    const questionId = "question_1";
+    const questionId = "currentQuestionId";
     final uid = FirebaseAuth.instance.currentUser?.uid;
     final votesRef = FirebaseFirestore.instance
         .collection('questions')
