@@ -28,7 +28,6 @@ class _QuestionPageState extends State<QuestionPage> {
   @override
   void initState() {
     super.initState();
-    _listenToVotes();
     _getActiveQuestion();
   }
 
@@ -75,23 +74,28 @@ class _QuestionPageState extends State<QuestionPage> {
   }
 
   Future<void> _getActiveQuestion() async {
-    final snapshot = await FirebaseFirestore.instance
+    final pointerDoc = await FirebaseFirestore.instance
         .collection('questions')
-        .where('isActive', isEqualTo: true)
-        .limit(1)
+        .doc('current_question')
         .get();
 
-    if (snapshot.docs.isNotEmpty) {
-      final doc = snapshot.docs.first;
+    final questionId = pointerDoc['activeQuestionId'];
+
+    final questionDoc = await FirebaseFirestore.instance
+        .collection('questions')
+        .doc(questionId)
+        .get();
+
+    if (questionDoc.exists) {
       setState(() {
-        questionText = doc['text'] ?? "No question text.";
-        currentQuestionId = doc.id;
+        questionText = questionDoc['text'] ?? "No question text.";
+        currentQuestionId = questionId;
         isLoading = false;
       });
-      _listenToVotes();
+      _listenToVotes(); // Attach listener for vote counts
     } else {
       setState(() {
-        questionText = "No active question.";
+        questionText = "Active question not found.";
         isLoading = false;
       });
     }
@@ -134,20 +138,28 @@ class _QuestionPageState extends State<QuestionPage> {
       }
 
       int totalVotes = currentYes + currentNo;
-      transaction.update(questionRef, {'totalVotes': totalVotes});
+      transaction.update(questionRef, {
+        'yesCount': currentYes,
+        'noCount': currentNo,
+        'totalVotes': totalVotes,
+      });
     });
 
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text("You Voted '$answer'")));
+
+    setState(() {
+      hasVoted = true;
+      userVote = answer;
+    });
   }
 
   void _listenToVotes() {
-    const questionId = "currentQuestionId";
     final uid = FirebaseAuth.instance.currentUser?.uid;
     final votesRef = FirebaseFirestore.instance
         .collection('questions')
-        .doc(questionId)
+        .doc(currentQuestionId)
         .collection('votes');
 
     votesRef.snapshots().listen((snapshot) {
